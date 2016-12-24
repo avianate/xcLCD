@@ -7,26 +7,19 @@
 
 #include <xc.h>
 #include "LCD.h"
+#include <string.h>
 
 void LCDInit() 
 {
     // clear latches before enabling TRIS bits
     LCD_PORT = 0;
     
-    TRISB = 0x00;
-    
     // required by display controller to allow power to stabilize
     __delay_ms(START_DELAY);
     
-    LCDCommand(0x32);
-    
-    LCDCommand(INTERFACE_MODE);
-    
-    LCDCommand(SET_DISPLAY);
-    
-    Clear();
-    
-    LCDCommand(INCREMENT_MODE);
+    // Required function set command at startup
+    Optrex4BitStartup();    
+     
 }
 
 void WriteCharacter(uint8_t letter)
@@ -59,10 +52,29 @@ void LCDCommand(uint8_t command)
     WriteNibble(command, instruction);
 }
 
-void WriteString(const char *str)
+void WriteString(const char *str, bool centerText)
 {
     uint8_t i = 0;
+    uint8_t j = 0;
+    uint8_t leftSpace = 0;
     
+    if (centerText) 
+    {
+        uint8_t length = strlen(str);
+        
+        if (length <= 16) 
+        {
+            uint8_t totalSpaces = NUMBER_OF_COLUMNS - strlen(str);
+            leftSpace = totalSpaces / 2;
+            
+            while (j < leftSpace) 
+            {
+                WriteCharacter(' ');
+                j++;
+            }
+        }
+    }
+        
     while (str[i])
     {
         WriteCharacter(str[i++]);
@@ -70,17 +82,15 @@ void WriteString(const char *str)
 }
 
 void WriteNibble(uint8_t nibble, uint8_t rs)
-{
-    // always send the upper nibble
-    nibble = (nibble >> 4);
+{   
+    // always use the upper nibble
+    // mask off the lower nibble
+    nibble = (nibble & 0xF0);
     
-    // mask off the nibble to be transmitted
-    nibble = (nibble & 0x0F);
+    // clear the upper half of the LCD_PORT
+    LCD_PORT = (LCD_PORT & 0x00);
     
-    // clear the lower half of the LCD_PORT
-    LCD_PORT = (LCD_PORT & 0xF0);
-    
-    // move the nibble onto the LCD_PORT
+    // move the nibble onto the LCD_PORT (PORTB only uses upper nibble)
     LCD_PORT = (LCD_PORT | nibble);
     
     // set data/instruction bit
@@ -108,4 +118,46 @@ void MoveTo(uint8_t line, uint8_t position)
     
     // wait for LCD
     __delay_ms(LCD_DELAY);
+}
+
+// Required Optrex DMC-16204 4-bit initialization sequence
+void Optrex4BitStartup(void) 
+{
+    uint8_t InitialCommand = 0x33;
+    uint8_t SecondCommand = 0x32;
+     
+    // send upper nibble of first command
+    WriteNibble(InitialCommand, instruction);
+    
+    // get the lower nibble of first command
+    InitialCommand = (InitialCommand << 4);
+    
+    // Wait more than 4.1ms before sending lower nibble
+    __delay_ms(LCD_DELAY);
+    
+    // Send lower nibble of first command
+    WriteNibble(InitialCommand, instruction);
+    
+    __delay_ms(1);
+    
+    LCDCommand(SecondCommand);
+    
+    LCDCommand(INTERFACE_MODE);
+      
+    LCDCommand(SET_DISPLAY);
+    
+    Clear();
+    
+    // 4bit interface, 2 lines, 5x8 font
+    LCDCommand(INCREMENT_MODE);
+    
+    // Display off
+    Off();
+    
+    Clear();
+    
+    LCDCommand(INCREMENT_MODE);
+    
+    // Display on, cursor off, blink off
+    LCDCommand(SET_DISPLAY);
 }

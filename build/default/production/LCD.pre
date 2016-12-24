@@ -14712,8 +14712,11 @@ void SYSTEM_Initialize(void);
 # 81
 void OSCILLATOR_Initialize(void);
 
-# 53 "LCD.h"
+# 56 "LCD.h"
 void LCDInit(void);
+
+
+void Optrex4BitStartup(void);
 
 
 void WriteCharacter(uint8_t letter);
@@ -14722,7 +14725,7 @@ void WriteCharacter(uint8_t letter);
 void LCDCommand(uint8_t command);
 
 
-void WriteString(const char *);
+void WriteString(const char *, bool centerText);
 
 
 void WriteNibble(uint8_t nibble, uint8_t rs);
@@ -14730,26 +14733,58 @@ void WriteNibble(uint8_t nibble, uint8_t rs);
 
 void MoveTo(uint8_t line, uint8_t position);
 
-# 11 "LCD.c"
+# 4 "/Applications/microchip/xc8/v1.40/include/__size_t.h"
+typedef unsigned size_t;
+
+# 14 "/Applications/microchip/xc8/v1.40/include/string.h"
+extern void * memcpy(void *, const void *, size_t);
+extern void * memmove(void *, const void *, size_t);
+extern void * memset(void *, int, size_t);
+
+
+
+extern void * __builtin_memcpy(void *, const void *, size_t);
+#pragma intrinsic(__builtin_memcpy)
+
+# 34
+extern char * strcat(char *, const char *);
+extern char * strcpy(char *, const char *);
+extern char * strncat(char *, const char *, size_t);
+extern char * strncpy(char *, const char *, size_t);
+extern char * strdup(const char *);
+extern char * strtok(char *, const char *);
+
+
+extern int memcmp(const void *, const void *, size_t);
+extern int strcmp(const char *, const char *);
+extern int stricmp(const char *, const char *);
+extern int strncmp(const char *, const char *, size_t);
+extern int strnicmp(const char *, const char *, size_t);
+extern void * memchr(const void *, int, size_t);
+extern size_t strcspn(const char *, const char *);
+extern char * strpbrk(const char *, const char *);
+extern size_t strspn(const char *, const char *);
+extern char * strstr(const char *, const char *);
+extern char * stristr(const char *, const char *);
+extern char * strerror(int);
+extern size_t strlen(const char *);
+extern char * strchr(const char *, int);
+extern char * strichr(const char *, int);
+extern char * strrchr(const char *, int);
+extern char * strrichr(const char *, int);
+
+# 12 "LCD.c"
 void LCDInit()
 {
 
-PORTB = 0;
-
-TRISB = 0x00;
+LATB = 0;
 
 
-_delay((unsigned long)((15)*(500000/4000.0)));
+_delay((unsigned long)((16)*(500000/4000.0)));
 
-LCDCommand(0x32);
 
-LCDCommand(0x28);
+Optrex4BitStartup();
 
-LCDCommand(0x0C);
-
-LCDCommand(0x01);
-
-LCDCommand(0x06);
 }
 
 void WriteCharacter(uint8_t letter)
@@ -14782,9 +14817,28 @@ _delay((unsigned long)((1)*(500000/4000.0)));
 WriteNibble(command, 0);
 }
 
-void WriteString(const char *str)
+void WriteString(const char *str, bool centerText)
 {
 uint8_t i = 0;
+uint8_t j = 0;
+uint8_t leftSpace = 0;
+
+if (centerText)
+{
+uint8_t length = strlen(str);
+
+if (length <= 16)
+{
+uint8_t totalSpaces = 16 - strlen(str);
+leftSpace = totalSpaces / 2;
+}
+}
+
+while (i < leftSpace)
+{
+WriteCharacter(' ');
+i++;
+}
 
 while (str[i])
 {
@@ -14795,27 +14849,25 @@ WriteCharacter(str[i++]);
 void WriteNibble(uint8_t nibble, uint8_t rs)
 {
 
-nibble = (nibble >> 4);
+
+nibble = (nibble & 0xF0);
 
 
-nibble = (nibble & 0x0F);
+LATB = (LATB & 0x00);
 
 
-PORTB = (PORTB & 0xF0);
-
-
-PORTB = (PORTB | nibble);
+LATB = (LATB | nibble);
 
 
 
 
-PORTCbits.RC7 = rs;
+LATCbits.LATC7 = rs;
 
 
-PORTCbits.RC6 = 1;
+LATCbits.LATC6 = 1;
 
 
-PORTCbits.RC6 = 0;
+LATCbits.LATC6 = 0;
 }
 
 void MoveTo(uint8_t line, uint8_t position)
@@ -14831,4 +14883,46 @@ LCDCommand((line == 1) ? (0xC0 | position) : (0x80 | position));
 
 
 _delay((unsigned long)((5)*(500000/4000.0)));
+}
+
+
+void Optrex4BitStartup(void)
+{
+uint8_t InitialCommand = 0x33;
+uint8_t SecondCommand = 0x32;
+
+
+WriteNibble(InitialCommand, 0);
+
+
+InitialCommand = (InitialCommand << 4);
+
+
+_delay((unsigned long)((5)*(500000/4000.0)));
+
+
+WriteNibble(InitialCommand, 0);
+
+_delay((unsigned long)((1)*(500000/4000.0)));
+
+LCDCommand(SecondCommand);
+
+LCDCommand(0x28);
+
+LCDCommand(0x0C);
+
+LCDCommand(0x01);
+
+
+LCDCommand(0x06);
+
+
+LCDCommand(0x08);
+
+LCDCommand(0x01);
+
+LCDCommand(0x06);
+
+
+LCDCommand(0x0C);
 }

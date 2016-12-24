@@ -9,13 +9,14 @@
 #define	LCD_H
 
 #include "mcc_generated_files/mcc.h"
+#include <xc.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
 #define LCD_DELAY               5           // ~5ms
-#define START_DELAY             15          // ~15ms
+#define START_DELAY             16          // ~16ms
 
 #define LCD_CLEAR               0x01
 #define LCD_HOME                0x02
@@ -32,25 +33,30 @@ extern "C" {
 #define INTERFACE_MODE          0x28        // 4 bit interface 2 lines, 5x8 font
 #define INCREMENT_MODE          0x06        // increment mode
 #define SET_DISPLAY             0x0C        // display on, cursor off, blink off
-
+#define DISPLAY_OFF             0x08        // display off
+    
 #define Line1                LCDCommand(LCD_HOME)
 #define Line2                LCDCommand(LCD_LINE2)
 #define MoveCursor()         LCDCommand(LCD_CURSOR_FORWARD)
 #define ShiftCursor()        LCDCommand(LCD_CURSOR_ON)
 #define Clear()              LCDCommand(LCD_CLEAR)
+#define Off()                LCDCommand(DISPLAY_OFF)
 
 #define data            1
 #define instruction     0
 
-#define LCD_PORT    PORTB
-#define LCD_EN      PORTCbits.RC6
-#define LCD_RS      PORTCbits.RC7
+#define LCD_PORT    LATB
+#define LCD_EN      E_LAT
+#define LCD_RS      RS_LAT
 
 #define NUMBER_OF_LINES     2
 #define NUMBER_OF_COLUMNS   16
 
 // Functions
 void LCDInit(void);
+
+// 4bit initialization routine for Optrex DMC-16204 LCD
+void Optrex4BitStartup(void);
 
 // Writes a character at the current cursor position
 void WriteCharacter(uint8_t letter);
@@ -59,7 +65,7 @@ void WriteCharacter(uint8_t letter);
 void LCDCommand(uint8_t command);
 
 // Writes string at the current cursor position
-void WriteString(const char *);
+void WriteString(const char *, bool centerText);
 
 // Writes the specified nibble to the LCD
 void WriteNibble(uint8_t nibble, uint8_t rs);
